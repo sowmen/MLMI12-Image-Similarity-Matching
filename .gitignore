@@ -1,0 +1,6 @@
+tiny-imagenet-200/
+wandb/
+weights/
+__pycache__/
+checkpoint/
+*.zip

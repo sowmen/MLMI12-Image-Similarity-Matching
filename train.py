@@ -23,18 +23,18 @@ from dataset import TinyImagenet
 from utils import *
 
 NUM_CLASSES = 100
-OUTPUT_DIR = ""
+OUTPUT_DIR = "/content/drive/MyDrive/MLMI12-Project"
 device =  'cuda'
 config_defaults = {
-    "epochs": 2,
-    "train_batch_size": 2,
-    "valid_batch_size": 4,
+    "epochs": 40,
+    "train_batch_size": 132,
+    "valid_batch_size": 86,
     "optimizer": "adam",
     "learning_rate": 0.0001,
     # "weight_decay": 0.0001,
     # "schedule_patience": 5,
     # "schedule_factor": 0.25,
-    "model": "EffNetB6",
+    "model": "EffNetB4",
 }
 
 def train(name, train_df, val_df, resume=None):
@@ -49,7 +49,7 @@ def train(name, train_df, val_df, resume=None):
     config = wandb.config
 
 
-    model = timm.create_model('tf_efficientnet_b6_ns', pretrained=True, num_classes=NUM_CLASSES)
+    model = timm.create_model('tf_efficientnet_b4_ns', pretrained=True, num_classes=NUM_CLASSES)
     model.to(device)
 
     # for name_, param in model.named_parameters():
@@ -69,7 +69,7 @@ def train(name, train_df, val_df, resume=None):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss().to(device)
-    es = EarlyStopping(patience=5, mode="min")
+    es = EarlyStopping(patience=10, mode="min")
 
 
     start_epoch = 0
@@ -125,7 +125,6 @@ def train_epoch(model, train_loader, optimizer, criterion, epoch):
         optimizer.zero_grad()
 
         preds = model(images)
-        print(labels.shape, preds.shape)
         loss = criterion(preds, labels.to(device))
         loss.backward()
 
@@ -134,13 +133,13 @@ def train_epoch(model, train_loader, optimizer, criterion, epoch):
         #---------------------Batch Loss Update-------------------------
         total_loss.update(loss.item(), train_loader.batch_size)
         total_acc.update(accuracy(preds.cpu(), labels.cpu()).item(), train_loader.batch_size)
-        total_acc.update(accuracy5(preds.cpu(), labels.cpu()).item(), train_loader.batch_size)
+        total_acc_top5.update(accuracy5(preds.cpu(), labels.cpu()).item(), train_loader.batch_size)
 
         
     train_metrics = {
         "train_loss" : total_loss.avg,
-        "train_acc" : total_acc.avg,
-        "train_acc_top5" : total_acc_top5.avg,
+        "train_acc" : total_acc.avg * 100,
+        "train_acc_top5" : total_acc_top5.avg * 100,
         "epoch" : epoch,
         "train_learning_rate" : optimizer.param_groups[0]['lr']
     }
@@ -171,13 +170,13 @@ def valid_epoch(model, valid_loader, criterion, epoch):
             #---------------------Batch Loss Update-------------------------
             total_loss.update(loss.item(), valid_loader.batch_size)
             total_acc.update(accuracy(preds.cpu(), labels.cpu()).item(), valid_loader.batch_size)
-            total_acc.update(accuracy5(preds.cpu(), labels.cpu()).item(), valid_loader.batch_size)
+            total_acc_top5.update(accuracy5(preds.cpu(), labels.cpu()).item(), valid_loader.batch_size)
 
         
     valid_metrics = {
         "valid_loss" : total_loss.avg,
-        "valid_acc" : total_acc.avg,
-        "valid_acc_top5" : total_acc_top5.avg,
+        "valid_acc" : total_acc.avg * 100,
+        "valid_acc_top5" : total_acc_top5.avg * 100,
         "epoch" : epoch
     }
     wandb.log(valid_metrics)

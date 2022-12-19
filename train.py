@@ -22,6 +22,8 @@ torch.backends.cudnn.benchmark = True
 from dataset import TinyImagenet
 from utils import *
 
+
+NUM_CLASSES = 100
 OUTPUT_DIR = "weights"
 device =  'cuda'
 config_defaults = {
@@ -29,7 +31,7 @@ config_defaults = {
     "train_batch_size": 4,
     "valid_batch_size": 6,
     "optimizer": "adam",
-    "learning_rate": 0.001,
+    "learning_rate": 0.0001,
     # "weight_decay": 0.0001,
     # "schedule_patience": 5,
     # "schedule_factor": 0.25,
@@ -48,7 +50,7 @@ def train(name, train_df, val_df, resume=None):
     config = wandb.config
 
 
-    model = timm.create_model('tf_efficientnet_b6_ns', pretrained=False, num_classes=200)
+    model = timm.create_model('tf_efficientnet_b6_ns', pretrained=True, num_classes=NUM_CLASSES)
     model.to(device)
 
     # for name_, param in model.named_parameters():
@@ -114,8 +116,8 @@ def train_epoch(model, train_loader, optimizer, criterion, epoch):
     total_acc = AverageMeter()
     total_acc_top5 = AverageMeter()
 
-    accuracy = Accuracy(task="multiclass", num_classes=200)
-    accuracy5 = Accuracy(task="multiclass", num_classes=200, top_k=5)
+    accuracy = Accuracy(task="multiclass", num_classes=NUM_CLASSES)
+    accuracy5 = Accuracy(task="multiclass", num_classes=NUM_CLASSES, top_k=5)
 
     for images, labels in tqdm(train_loader):
         images = images.to(device)
@@ -154,8 +156,8 @@ def valid_epoch(model, valid_loader, criterion, epoch):
     total_acc = AverageMeter()
     total_acc_top5 = AverageMeter()
 
-    accuracy = Accuracy(task="multiclass", num_classes=200)
-    accuracy5 = Accuracy(task="multiclass", num_classes=200, top_k=5)
+    accuracy = Accuracy(task="multiclass", num_classes=NUM_CLASSES)
+    accuracy5 = Accuracy(task="multiclass", num_classes=NUM_CLASSES, top_k=5)
 
     with torch.no_grad():
         for images, labels in tqdm(valid_loader):

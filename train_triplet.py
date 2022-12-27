@@ -204,8 +204,8 @@ def test(model):
             im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
             tensor1 = transform(im1).unsqueeze(0).to(device)
 
-            feature1 = model(tensor1).cpu()
-            feature1 = torch.nn.functional.normalize(feature1).squeeze()
+            feature1 = model(tensor1).cpu().squeeze()
+            # feature1 = torch.nn.functional.normalize(feature1).squeeze()
 
 
             ########################################
@@ -214,8 +214,8 @@ def test(model):
             im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
             tensor2 = transform(im2).unsqueeze(0).to(device)
 
-            feature2 = model(tensor2).cpu()
-            feature2 = torch.nn.functional.normalize(feature2).squeeze()
+            feature2 = model(tensor2).cpu().squeeze()
+            # feature2 = torch.nn.functional.normalize(feature2).squeeze()
 
             #########################################
 

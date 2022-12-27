@@ -10,12 +10,15 @@ import math
 
 import timm
 from torchmetrics import Accuracy
+import cv2
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import wandb
+from torchvision import transforms
+from sklearn.metrics import accuracy_score
 
 
 torch.backends.cudnn.benchmark = True
@@ -23,19 +26,19 @@ from dataset import TinyImagenet
 from utils import *
 from models import Network
 
-NUM_CLASSES = 100
+NUM_CLASSES = 50
 OUTPUT_DIR = "/content/drive/MyDrive/MLMI12-Project"
 device =  'cuda'
 config_defaults = {
     "epochs": 40,
-    "train_batch_size": 64,
+    "train_batch_size": 60,
     "valid_batch_size": 32,
     "optimizer": "adam",
     "learning_rate": 0.0001,
     # "weight_decay": 0.0001,
     # "schedule_patience": 5,
     # "schedule_factor": 0.25,
-    "model": "EffNetB4",
+    "model": "end-end50_128",
 }
 
 def train(name, train_df, val_df, resume=None):
@@ -50,7 +53,7 @@ def train(name, train_df, val_df, resume=None):
     config = wandb.config
 
 
-    model = Network()
+    model = Network(num_classes = NUM_CLASSES, emb_dim=128)
     model.to(device)
 
     # for name_, param in model.named_parameters():
@@ -70,7 +73,7 @@ def train(name, train_df, val_df, resume=None):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.TripletMarginLoss().to(device)
-    es = EarlyStopping(patience=10, mode="min")
+    es = EarlyStopping(patience=5, mode="min")
 
 
     start_epoch = 0
@@ -108,6 +111,9 @@ def train(name, train_df, val_df, resume=None):
             'optimizer_state_dict' : optimizer.state_dict(),
         }
         torch.save(checkpoint, os.path.join(OUTPUT_DIR, 'checkpoint', f"{run}.pt"))
+
+    model.load_state_dict(torch.load(os.path.join(OUTPUT_DIR, "weights", f"{run}.h5")))
+    test(model)
 
 
 def train_epoch(model, train_loader, optimizer, criterion, epoch):
@@ -173,6 +179,62 @@ def valid_epoch(model, valid_loader, criterion, epoch):
     wandb.log(valid_metrics)
 
     return valid_metrics
+
+
+def test(model):
+    model.eval()
+
+    transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize((128, 128)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    ])
+
+    def test_df(path): 
+        print("Testing ---- ", path)
+
+        seen_seen_df = pd.read_csv(path).values
+
+        similarity_outs = []
+        labels = []
+        for row in tqdm(seen_seen_df):
+
+            im1 = cv2.imread(os.path.join('tiny-imagenet-200', row[0]), cv2.IMREAD_COLOR)
+            im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
+            tensor1 = transform(im1).unsqueeze(0).to(device)
+
+            feature1 = model(tensor1).cpu()
+            feature1 = torch.nn.functional.normalize(feature1).squeeze()
+
+
+            ########################################
+
+            im2 = cv2.imread(os.path.join('tiny-imagenet-200', row[1]), cv2.IMREAD_COLOR)
+            im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
+            tensor2 = transform(im2).unsqueeze(0).to(device)
+
+            feature2 = model(tensor2).cpu()
+            feature2 = torch.nn.functional.normalize(feature2).squeeze()
+
+            #########################################
+
+            labels.append(row[2])
+
+            csim = torch.nn.functional.cosine_similarity(feature1, feature2, dim=0).item()
+            similarity_outs.append(1 if csim > 0.1 else 0)
+
+        csim_acc = accuracy_score(labels, similarity_outs)
+        print("Cosine Similarity (0.1) Accuracy: ", csim_acc)
+
+        wandb.log({
+            f"{path.split('.')[0]}": csim_acc
+        })
+
+    
+    test_df('seen_seen_test.csv')
+    test_df('seen_unseen_test.csv')
+    test_df('unseen_unseen_test.csv')
 
 
 if __name__ == "__main__":

@@ -2,12 +2,12 @@ from torch import nn
 import timm
 
 class Network(nn.Module):
-    def __init__(self, emb_dim=256):
+    def __init__(self, num_classes, emb_dim):
         super(Network, self).__init__()
 
-        self.base = timm.create_model('tf_efficientnet_b4_ns', pretrained=True, num_classes=100)
+        self.base = timm.create_model('tf_efficientnet_b4_ns', pretrained=True, num_classes=num_classes)
         
-        self.fc = nn.Sequential(
+        self.projection = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
             nn.Linear(1792, 512),
@@ -17,8 +17,8 @@ class Network(nn.Module):
         
     def forward(self, x):
         x = self.base.forward_features(x)
-        x = self.fc(x)
-        # x = nn.functional.normalize(x)
+        x = self.projection(x)
+        x = nn.functional.normalize(x)
         return x
     
     def freeze_base(self):

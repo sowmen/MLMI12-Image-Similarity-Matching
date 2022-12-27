@@ -7,22 +7,23 @@ from datetime import datetime
 from sklearn import metrics
 import gc
 import math
-
+import cv2
 import timm
 from torchmetrics import Accuracy
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torchvision import transforms
 from torch.utils.data import DataLoader
 import wandb
+from sklearn.metrics import accuracy_score
 
 
 torch.backends.cudnn.benchmark = True
 from dataset import TinyImagenet
 from utils import *
 
-NUM_CLASSES = 100
+NUM_CLASSES = 50
 OUTPUT_DIR = "/content/drive/MyDrive/MLMI12-Project"
 device =  'cuda'
 config_defaults = {
@@ -69,7 +70,7 @@ def train(name, train_df, val_df, resume=None):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.CrossEntropyLoss().to(device)
-    es = EarlyStopping(patience=10, mode="min")
+    es = EarlyStopping(patience=5, mode="min")
 
 
     start_epoch = 0
@@ -107,6 +108,9 @@ def train(name, train_df, val_df, resume=None):
             'optimizer_state_dict' : optimizer.state_dict(),
         }
         torch.save(checkpoint, os.path.join(OUTPUT_DIR, 'checkpoint', f"{run}.pt"))
+
+    model.load_state_dict(torch.load(os.path.join(OUTPUT_DIR, "weights", f"{run}.h5")))
+    test(model)
 
 
 def train_epoch(model, train_loader, optimizer, criterion, epoch):
@@ -182,6 +186,74 @@ def valid_epoch(model, valid_loader, criterion, epoch):
     wandb.log(valid_metrics)
 
     return valid_metrics
+
+
+def test(model):
+    model.eval()
+
+    transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize((128, 128)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    ])
+
+    def test_df(path): 
+        print("Testing ---- ", path)
+
+        seen_seen_df = pd.read_csv(path).values
+
+        pred_outs = []
+        similarity_outs = []
+        labels = []
+        for row in tqdm(seen_seen_df):
+
+            im1 = cv2.imread(os.path.join('tiny-imagenet-200', row[0]), cv2.IMREAD_COLOR)
+            im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
+            tensor1 = transform(im1).unsqueeze(0).to(device)
+
+            feature1 = model.forward_features(tensor1).cpu().squeeze()
+            feature1 = torch.nn.functional.avg_pool2d(feature1, 4)
+            feature1 = torch.nn.functional.normalize(feature1).squeeze()
+
+            out1 = model(tensor1).cpu().squeeze().argmax()
+
+            ########################################
+
+            im2 = cv2.imread(os.path.join('tiny-imagenet-200', row[1]), cv2.IMREAD_COLOR)
+            im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
+            tensor2 = transform(im2).unsqueeze(0).to(device)
+
+            feature2 = model.forward_features(tensor2).cpu().squeeze()
+            feature2 = torch.nn.functional.avg_pool2d(feature2, 4)
+            feature2 = torch.nn.functional.normalize(feature2).squeeze()
+
+            out2 = model(tensor2).cpu().squeeze().argmax()
+
+            #########################################
+
+            pred_outs.append(1 if out1.item() == out2.item() else 0)
+            labels.append(row[2])
+
+            csim = torch.nn.functional.cosine_similarity(feature1, feature2, dim=0).item()
+            similarity_outs.append(1 if csim > 0.1 else 0)
+
+        
+        m_acc = accuracy_score(labels, pred_outs)
+        csim_acc = accuracy_score(labels, similarity_outs)
+
+        print("Multiclass Accuracy: ", m_acc)
+        print("Cosine Similarity (0.1) Accuracy: ", csim_acc)
+
+        wandb.log({
+            f"{path.split('.')[0]}_multiclass_acc": m_acc,
+            f"{path.split('.')[0]}_csim_acc": csim_acc,
+        })
+
+    
+    test_df('seen_seen_test.csv')
+    test_df('seen_unseen_test.csv')
+    test_df('unseen_unseen_test.csv')
 
 
 if __name__ == "__main__":

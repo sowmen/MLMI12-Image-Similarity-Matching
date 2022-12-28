@@ -30,15 +30,15 @@ NUM_CLASSES = 50
 OUTPUT_DIR = "/content/drive/MyDrive/MLMI12-Project"
 device =  'cuda'
 config_defaults = {
-    "epochs": 40,
+    "epochs": 100,
     "train_batch_size": 60,
     "valid_batch_size": 32,
     "optimizer": "adam",
-    "learning_rate": 0.0001,
+    "learning_rate": 0.00001,
     # "weight_decay": 0.0001,
     # "schedule_patience": 5,
     # "schedule_factor": 0.25,
-    "model": "end-end50_128",
+    "model": "end-end50",
 }
 
 def train(name, train_df, val_df, resume=None):
@@ -73,7 +73,7 @@ def train(name, train_df, val_df, resume=None):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.TripletMarginLoss().to(device)
-    es = EarlyStopping(patience=5, mode="min")
+    es = EarlyStopping(patience=7, mode="min")
 
 
     start_epoch = 0
@@ -204,8 +204,8 @@ def test(model):
             im1 = cv2.cvtColor(im1, cv2.COLOR_BGR2RGB)
             tensor1 = transform(im1).unsqueeze(0).to(device)
 
-            feature1 = model(tensor1).cpu().squeeze()
-            # feature1 = torch.nn.functional.normalize(feature1).squeeze()
+            feature1 = model(tensor1).cpu()
+            # feature1 = torch.nn.functional.normalize(feature1)
 
 
             ########################################
@@ -214,14 +214,14 @@ def test(model):
             im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
             tensor2 = transform(im2).unsqueeze(0).to(device)
 
-            feature2 = model(tensor2).cpu().squeeze()
-            # feature2 = torch.nn.functional.normalize(feature2).squeeze()
+            feature2 = model(tensor2).cpu()
+            # feature2 = torch.nn.functional.normalize(feature2)
 
             #########################################
 
             labels.append(row[2])
 
-            csim = torch.nn.functional.cosine_similarity(feature1, feature2, dim=0).item()
+            csim = torch.nn.functional.cosine_similarity(feature1.squeeze(), feature2.squeeze(), dim=0).item()
             similarity_outs.append(1 if csim > 0.1 else 0)
 
         csim_acc = accuracy_score(labels, similarity_outs)
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     val_df = pd.read_csv('val.csv')
 
     train(
-        name=f"Triplet512" + config_defaults["model"],
+        name=f"Triplet128" + config_defaults["model"],
         train_df=train_df,
         val_df=val_df,
         resume=None

@@ -30,11 +30,11 @@ NUM_CLASSES = 50
 OUTPUT_DIR = "/content/drive/MyDrive/MLMI12-Project"
 device =  'cuda'
 config_defaults = {
-    "epochs": 100,
+    "epochs": 40,
     "train_batch_size": 60,
     "valid_batch_size": 32,
     "optimizer": "adam",
-    "learning_rate": 0.00001,
+    "learning_rate": 0.0001,
     # "weight_decay": 0.0001,
     # "schedule_patience": 5,
     # "schedule_factor": 0.25,

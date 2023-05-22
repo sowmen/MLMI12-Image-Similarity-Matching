@@ -29,7 +29,7 @@ OUTPUT_DIR = "/content/drive/MyDrive/MLMI12-Project"
 device =  'cuda'
 config_defaults = {
     "epochs": 40,
-    "train_batch_size": 56,
+    "train_batch_size": 80,
     "valid_batch_size": 64,
     "optimizer": "adam",
     "learning_rate": 0.0001,
@@ -128,7 +128,7 @@ def train_epoch(model, train_loader, optimizer, criterion, epoch):
 
         optimizer.zero_grad()
 
-        preds = model(image1, image2)
+        preds = model(image1, image2).squeeze()
         loss = criterion(preds, labels.to(device))
         loss.backward()
 
@@ -136,7 +136,7 @@ def train_epoch(model, train_loader, optimizer, criterion, epoch):
         
         #---------------------Batch Loss Update-------------------------
         total_loss.update(loss.item(), train_loader.batch_size)
-        total_acc.update(accuracy(preds.cpu(), labels.cpu()).item(), train_loader.batch_size)
+        total_acc.update(accuracy(preds.cpu(), (labels.cpu() > 0.5).to(torch.int32)).item(), train_loader.batch_size)
 
         
     train_metrics = {
@@ -163,13 +163,13 @@ def valid_epoch(model, valid_loader, criterion, epoch):
             image1 = image1.to(device)
             image2 = image2.to(device)
 
-            preds = model(image1, image2)
+            preds = model(image1, image2).squeeze()
 
             loss = criterion(preds, labels.to(device))
             
             #---------------------Batch Loss Update-------------------------
             total_loss.update(loss.item(), valid_loader.batch_size)
-            total_acc.update(accuracy(preds.cpu(), labels.cpu()).item(), valid_loader.batch_size)
+            total_acc.update(accuracy(preds.cpu(), (labels.cpu() > 0.5).to(torch.int32)).item(), valid_loader.batch_size)
 
         
     valid_metrics = {

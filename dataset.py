@@ -1,5 +1,4 @@
 
-import PIL
 import numpy as np
 import cv2
 import random
@@ -106,6 +105,6 @@ class ComboDataset(Dataset):
             negative_image = self.transform(negative_image)
 
         if random.uniform(0, 10) < 5:
-            return anchor_image, positive_image, 0.99
+            return anchor_image, positive_image, np.float32(0.99)
         else:
-            return anchor_image, negative_image, 0.01
+            return anchor_image, negative_image, np.float32(0.01)
